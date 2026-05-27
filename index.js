@@ -3851,6 +3851,15 @@ try {
     server = app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Server web attivo sulla porta ${PORT}`);
         console.log(`🌐 Status page: https://gg-shaderss.onrender.com`);
+
+        // Keep-alive: impedisce a Render di addormentare il bot
+        const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+        setInterval(async () => {
+            try {
+                await fetch(`${RENDER_URL}/api/status`);
+                console.log('💓 Keep-alive ping inviato');
+            } catch (e) { /* silenzioso */ }
+        }, 14 * 60 * 1000); // ogni 14 minuti
         
         // Crea la cartella transcripts all'avvio
         const transcriptDir = path.join(__dirname, 'transcripts');
