@@ -79,7 +79,7 @@ async function createTicket(interaction, optionValue) {
             if (!channelExists) {
                 console.log(`Pulizia ticket orfano: ${ticket.id}`);
                 await db.query(
-                    'UPDATE tickets SET status = $1, closed_at = datetime('now'), close_reason = $2 WHERE id = $3',
+                    `UPDATE tickets SET status = $1, closed_at = NOW(), close_reason = $2 WHERE id = $3`,
                     ['closed', 'Pulizia automatica: canale eliminato', ticket.id]
                 );
             } else {
@@ -470,7 +470,7 @@ async function closeTicketWithReason(interaction) {
 
         // === AGGIORNA DB ===
         await db.query(
-            'UPDATE tickets SET status = $1, closed_at = datetime('now'), close_reason = $2 WHERE id = $3',
+            `UPDATE tickets SET status = $1, closed_at = NOW(), close_reason = $2 WHERE id = $3`,
             ['closed', reason, ticket.id]
         );
 
@@ -852,7 +852,7 @@ async function forceCloseTicket(guildId, userId, reason = "Forzatura amministrat
         const ticket = anyTicket.rows[0];
         if (ticket.status === 'closed') return { success: true, message: "Già chiuso" };
         await db.query(
-            'UPDATE tickets SET status = $1, closed_at = datetime('now'), close_reason = $2 WHERE id = $3',
+            `UPDATE tickets SET status = $1, closed_at = NOW(), close_reason = $2 WHERE id = $3`,
             ['closed', reason, ticket.id]
         );
         return { success: true, message: "Chiuso con successo" };
