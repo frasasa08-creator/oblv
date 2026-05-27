@@ -544,8 +544,8 @@ app.post('/api/ticket/send-message', async (req, res) => {
              WHERE ticket_id = $1 
              AND content = $2 
              AND username = $3 
-             AND is_staff = 1 
-             AND timestamp > datetime('now', '-2 seconds')`,
+             AND is_staff = true 
+             AND timestamp > NOW() - INTERVAL '2 seconds'`,
             [ticketId, message, username]
         );
 
@@ -556,7 +556,7 @@ app.post('/api/ticket/send-message', async (req, res) => {
 
         // 2. Salva il messaggio come STAFF
         const messageQuery = await db.query(
-            'INSERT INTO messages (ticket_id, username, content, is_staff, timestamp) VALUES ($1, $2, $3, $4, datetime('now')) RETURNING *',
+            `INSERT INTO messages (ticket_id, username, content, is_staff, timestamp) VALUES ($1, $2, $3, $4, NOW()) RETURNING *`,
             [ticketId, username, message, true]
         );
 
@@ -684,12 +684,12 @@ app.delete('/api/cleanup-duplicates-improved', async (req, res) => {
                 JOIN messages m2 ON 
                     m1.ticket_id = m2.ticket_id 
                     AND m1.content = m2.content 
-                    AND m1.timestamp > datetime('now', '-1 hour')
-                    AND m2.timestamp > datetime('now', '-1 hour')
+                    AND m1.timestamp > NOW() - INTERVAL '1 hour'
+                    AND m2.timestamp > NOW() - INTERVAL '1 hour'
                     AND m1.id > m2.id
                     AND (
-                        (m1.is_staff = 1 AND m2.is_staff = 0) OR
-                        (m1.is_staff = 0 AND m2.is_staff = 1)
+                        (m1.is_staff = true AND m2.is_staff = false) OR
+                        (m1.is_staff = false AND m2.is_staff = true)
                     )
             )
         `);
@@ -3983,60 +3983,64 @@ app.get('/api/stats', async (req, res) => {
 
 async function initDatabase() {
     try {
-        // SQLite: TEXT invece di VARCHAR/JSONB/SERIAL/TIMESTAMP
         await db.query(`
             CREATE TABLE IF NOT EXISTS guild_settings (
-                guild_id TEXT PRIMARY KEY,
-                welcome_channel_id TEXT,
-                welcome_log_channel_id TEXT,
-                quit_log_channel_id TEXT,
-                ticket_log_channel_id TEXT,
-                moderation_log_channel_id TEXT,
+                guild_id VARCHAR(20) PRIMARY KEY,
+                welcome_channel_id VARCHAR(20),
+                welcome_log_channel_id VARCHAR(20),
+                quit_log_channel_id VARCHAR(20),
+                ticket_log_channel_id VARCHAR(20),
+                moderation_log_channel_id VARCHAR(20),
                 welcome_image_url TEXT,
                 ticket_categories TEXT,
-                settings TEXT DEFAULT '{}',
-                created_at TEXT DEFAULT (datetime('now')),
-                updated_at TEXT DEFAULT (datetime('now'))
+                settings JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
         await db.query(`
             CREATE TABLE IF NOT EXISTS tickets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                guild_id TEXT NOT NULL,
-                user_id TEXT NOT NULL,
-                channel_id TEXT NOT NULL,
-                ticket_type TEXT NOT NULL,
-                status TEXT DEFAULT 'open',
-                channel_name TEXT,
-                created_at TEXT DEFAULT (datetime('now')),
-                closed_at TEXT,
+                id SERIAL PRIMARY KEY,
+                guild_id VARCHAR(20) NOT NULL,
+                user_id VARCHAR(20) NOT NULL,
+                channel_id VARCHAR(20) NOT NULL,
+                ticket_type VARCHAR(100) NOT NULL,
+                status VARCHAR(20) DEFAULT 'open',
+                channel_name VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                closed_at TIMESTAMP,
                 close_reason TEXT
             )
         `);
-    
+
         await db.query(`
             CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticket_id TEXT NOT NULL,
-                username TEXT NOT NULL,
+                id SERIAL PRIMARY KEY,
+                ticket_id VARCHAR(50) NOT NULL,
+                username VARCHAR(100) NOT NULL,
                 content TEXT NOT NULL,
-                is_staff INTEGER DEFAULT 0,
-                timestamp TEXT DEFAULT (datetime('now'))
+                is_staff BOOLEAN DEFAULT false,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-        // Colonna is_staff già inclusa nella CREATE TABLE sopra
         try {
-              await db.query(`ALTER TABLE messages ADD COLUMN is_staff INTEGER DEFAULT 0`);
-          } catch (alterError) {
-              // Colonna già esistente, ignorato
-          }
-          
-          console.log('✅ Database SQLite locale inizializzato correttamente');
-      } catch (error) {
-          console.error('❌ Errore inizializzazione database:', error);
-      }
-  }
+            await db.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS is_staff BOOLEAN DEFAULT false`);
+        } catch (alterError) {
+            // Colonna già esistente, ignorato
+        }
+
+        try {
+            await db.query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS channel_name VARCHAR(100)`);
+        } catch (alterError) {
+            // Colonna già esistente, ignorato
+        }
+
+        console.log('✅ Database Neon PostgreSQL inizializzato correttamente');
+    } catch (error) {
+        console.error('❌ Errore inizializzazione database:', error);
+    }
+}
         
 let isDeploying = false;
 async function deployCommands() {
@@ -4178,8 +4182,8 @@ client.on('messageCreate', async (message) => {
              WHERE ticket_id = $1 
              AND content = $2 
              AND username = $3 
-             AND is_staff = 0 
-             AND timestamp > datetime('now', '-2 seconds')`,
+             AND is_staff = false 
+             AND timestamp > NOW() - INTERVAL '2 seconds'`,
             [ticket.id.toString(), message.content, message.author.username]
         );
 
@@ -4190,7 +4194,7 @@ client.on('messageCreate', async (message) => {
 
         // Salva il messaggio dell'utente
         await db.query(
-            'INSERT INTO messages (ticket_id, username, content, is_staff, timestamp) VALUES ($1, $2, $3, $4, datetime('now'))',
+            `INSERT INTO messages (ticket_id, username, content, is_staff, timestamp) VALUES ($1, $2, $3, $4, NOW())`,
             [ticket.id.toString(), message.author.username, message.content, false]
         );
         console.log(`💾 Messaggio UTENTE salvato per ticket ${ticket.id}: ${message.author.username}`);

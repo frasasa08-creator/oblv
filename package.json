@@ -5,13 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
-    "monitor": "./monitor-bot.sh",
-    "setup": "chmod +x monitor-bot.sh && pm2 start index.js --name discord-bot && pm2 start monitor-bot.sh --name bot-monitor && pm2 save",
-    "deploy": "npm run setup"
+    "dev": "nodemon index.js"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.3",
+    "pg": "^8.11.3",
     "canvas": "^2.11.2",
     "discord.js": "^14.24.2",
     "dotenv": "^16.3.1",
@@ -19,9 +16,6 @@
     "express-session": "^1.17.3",
     "passport": "^0.7.0",
     "passport-discord": "^0.1.4",
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7",
-    "pm2": "^6.0.13",
     "ws": "^8.14.2"
   },
   "devDependencies": {
